@@ -1,14 +1,28 @@
 param(
     [Parameter(Mandatory = $true)]
+    [ValidateScript({
+        if ($_ -match '^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$') { $true }
+        else { throw "'$_' is geen geldig IPv4-adres (bv. 192.168.1.50)." }
+    })]
     [string]$IPAddress,
 
+    [ValidateRange(1, 32)]
     [int]$PrefixLength = 24,
 
     [Parameter(Mandatory = $true)]
+    [ValidateScript({
+        if ($_ -match '^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$') { $true }
+        else { throw "'$_' is geen geldige gateway (bv. 192.168.1.1)." }
+    })]
     [string]$Gateway,
 
+    [ValidateScript({
+        if ($_ -match '^((25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(25[0-5]|2[0-4]\d|1?\d?\d)$') { $true }
+        else { throw "'$_' is geen geldige DNS-server." }
+    })]
     [string[]]$DNS = @("1.1.1.1", "8.8.8.8"),
 
+    [ValidatePattern('^(eth|en)[a-z0-9]+$')]
     [string]$Interface = "eth0"
 )
 
