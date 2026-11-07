@@ -17,7 +17,10 @@ network:
 
 $yaml = $yaml -replace "`r`n", "`n"
 
-$path = Join-Path (Get-Location) "network-config"
+$disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "VolumeName = 'bootfs'"
+$bootRoot = $disk.DeviceID + "\"
+
+$path = Join-Path $bootRoot "network-config"
 [System.IO.File]::WriteAllText($path, $yaml + "`n", (New-Object System.Text.UTF8Encoding($false)))
 
 Write-Host "Geschreven: $path"
