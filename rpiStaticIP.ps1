@@ -1,9 +1,16 @@
-# Instellingen
-$interface = "eth0"
-$ip        = "192.168.1.50"
-$prefix    = 24
-$gateway   = "192.168.1.1"
-$dns       = @("1.1.1.1", "8.8.8.8")
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$IPAddress,
+
+    [int]$PrefixLength = 24,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Gateway,
+
+    [string[]]$DNS = @("1.1.1.1", "8.8.8.8"),
+
+    [string]$Interface = "eth0"
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -12,17 +19,17 @@ $lines = @(
     "network:"
     "  version: 2"
     "  ethernets:"
-    "    ${interface}:"
+    "    ${Interface}:"
     "      dhcp4: false"
     "      addresses:"
-    "        - $ip/$prefix"
+    "        - $IPAddress/$PrefixLength"
     "      routes:"
     "        - to: default"
-    "          via: $gateway"
+    "          via: $Gateway"
     "      nameservers:"
     "        addresses:"
 )
-foreach ($server in $dns) {
+foreach ($server in $DNS) {
     $lines += "          - $server"
 }
 
