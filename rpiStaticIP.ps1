@@ -1,26 +1,64 @@
-$yaml = @"
-network:
-  version: 2
-  ethernets:
-    eth0:
-      dhcp4: false
-      addresses:
-        - 192.168.1.50/24
-      routes:
-        - to: default
-          via: 192.168.1.1
-      nameservers:
-        addresses:
-          - 1.1.1.1
-          - 8.8.8.8
-"@
+# Instellingen
+$interface = "eth0"
+$ip        = "192.168.1.50"
+$prefix    = 24
+$gateway   = "192.168.1.1"
+$dns       = @("1.1.1.1", "8.8.8.8")
 
-$yaml = $yaml -replace "`r`n", "`n"
+$ErrorActionPreference = "Stop"
 
-$disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "VolumeName = 'bootfs'"
-$bootRoot = $disk.DeviceID + "\"
+# 1. YAML opbouwen (Netplan v2 / cloud-init)
+$lines = @(
+    "network:"
+    "  version: 2"
+    "  ethernets:"
+    "    ${interface}:"
+    "      dhcp4: false"
+    "      addresses:"
+    "        - $ip/$prefix"
+    "      routes:"
+    "        - to: default"
+    "          via: $gateway"
+    "      nameservers:"
+    "        addresses:"
+)
+foreach ($server in $dns) {
+    $lines += "          - $server"
+}
 
+# Linux-regeleindes: enkel LF
+$yaml = ($lines -join "`n") + "`n"
+
+# 2. Boot-partitie met label 'bootfs' zoeken
+$disks = @(Get-CimInstance -ClassName Win32_LogicalDisk -Filter "VolumeName = 'bootfs'")
+
+if ($disks.Count -eq 0) {
+    Write-Host "Geen schijf met label 'bootfs' gevonden. Steek het SD-kaartje in." -ForegroundColor Red
+    exit 1
+}
+if ($disks.Count -gt 1) {
+    Write-Host "Meerdere 'bootfs'-schijven gevonden: $(($disks.DeviceID) -join ', '). Laat er maar een zitten." -ForegroundColor Red
+    exit 1
+}
+
+$bootRoot = $disks[0].DeviceID + "\"
 $path = Join-Path $bootRoot "network-config"
-[System.IO.File]::WriteAllText($path, $yaml + "`n", (New-Object System.Text.UTF8Encoding($false)))
+Write-Host "Boot-partitie gevonden: $bootRoot"
 
-Write-Host "Geschreven: $path"
+# 3. Niet bevuilen: identieke inhoud = niets doen, anders volledig overschrijven
+if ((Test-Path $path) -and ([System.IO.File]::ReadAllText($path) -ceq $yaml)) {
+    Write-Host "network-config is al up-to-date, niets gewijzigd." -ForegroundColor Yellow
+}
+else {
+    # WriteAllText overschrijft het hele bestand; UTF-8 zonder BOM
+    [System.IO.File]::WriteAllText($path, $yaml, (New-Object System.Text.UTF8Encoding($false)))
+    Write-Host "Geschreven: $path" -ForegroundColor Green
+}
+
+# 4. Controle: geen CR-tekens (Windows-regeleindes)
+$bytes = [System.IO.File]::ReadAllBytes($path)
+if ($bytes -contains 13) {
+    Write-Host "FOUT: bestand bevat Windows-regeleindes (CRLF)!" -ForegroundColor Red
+    exit 1
+}
+Write-Host "Controle OK: Linux-tekstbestand (enkel LF)." -ForegroundColor Green
